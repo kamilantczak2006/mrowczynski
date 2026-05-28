@@ -6,6 +6,6 @@ int main()
 {
     cout << "Hello!" << endl;
     return 0;
-
+    cout<<"marcinek";
 }
 //marcin jest cwelem
