@@ -8,4 +8,3 @@ int main()
     return 0;
     cout<<"marcinek";
 }
-//marcin jest cwelem
