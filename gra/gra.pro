@@ -4,6 +4,8 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += \
+        Bullet.cpp \
+        Enemy.cpp \
         GameObject.cpp \
         Student.cpp \
         main.cpp
@@ -14,5 +16,7 @@ SOURCES += \
                 -lsfml-system
 
 HEADERS += \
+    Bullet.h \
+    Enemy.h \
     GameObject.h \
     Student.h
