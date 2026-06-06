@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <SFML/Graphics.hpp>
 
-// Nasze klasy obiektowe
+
 #include "GameObject.h"
 #include "Student.h"
 #include "Enemy.h"
@@ -53,7 +53,9 @@ int main() {
 
     // Główna pętla
     while (window.isOpen()) {
+
         float dt = clock.restart().asSeconds();
+
 
         sf::Event event;
         while (window.pollEvent(event)) {
@@ -187,6 +189,7 @@ int main() {
             for (auto& obj : allObjects) {
                 obj->draw(window);
             }
+
         }
 
         if (hasFont) window.draw(uiText);
