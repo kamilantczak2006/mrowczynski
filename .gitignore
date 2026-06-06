@@ -1,0 +1,14 @@
+# Foldery budowania (build) i pliki binarne
+build*/
+*.exe
+*.o
+*.obj
+
+# Pliki konfiguracji i cache środowiska Qt Creator
+CMakeLists.txt.user*
+.qtc_clangd/
+.qmake.stash
+
+# Inne pliki systemowe
+.DS_Store
+Thumbs.db
