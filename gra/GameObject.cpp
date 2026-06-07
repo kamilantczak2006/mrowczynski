@@ -8,7 +8,12 @@ GameObject::GameObject(float startX, float startY, float startSpeed) {
     rotationSpeed = 0.0f;
 }
 
-// Zwykłe metody (gettery)
+void GameObject::forceMove(float dx, float dy) {
+    position.x += dx;
+    position.y += dy;
+    shape.setPosition(position);
+}
+// (gettery)
 sf::Vector2f GameObject::getPosition() const {
     return position;
 }

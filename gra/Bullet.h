@@ -5,10 +5,13 @@
 class Bullet : public GameObject {
 private:
     sf::Vector2f velocity;
-    sf::CircleShape circleShape; // Dodajemy własne koło tylko do wyświetlania
+    sf::CircleShape circleShape;
 
 public:
-    Bullet(float startX, float startY, sf::Vector2f dir, float bulletSpeed);
+    bool isEnemyBullet; // NOWE
+
+    // Zmieniony konstruktor:
+    Bullet(float startX, float startY, sf::Vector2f dir, float bulletSpeed, sf::Color color, bool enemyBullet);
 
     void update(float dt) override;
     void draw(sf::RenderWindow& window) override;

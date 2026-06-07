@@ -51,3 +51,6 @@ void Enemy::takeDamage(int amount) {
 int Enemy::getHp() const {
     return hp;
 }
+bool Enemy::tryShoot(sf::Vector2f& outDir) {
+    return false;
+}

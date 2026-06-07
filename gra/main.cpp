@@ -4,11 +4,32 @@
 #include <cstdlib>
 #include <SFML/Graphics.hpp>
 
-
+#include "ShooterEnemy.h"
+#include "Portal.h"
 #include "GameObject.h"
 #include "Student.h"
 #include "Enemy.h"
 #include "Bullet.h"
+#include "Obstacle.h"
+
+// Funkcja wypychająca obiekty z przeszkód
+void resolveSolidCollision(GameObject* entity, GameObject* obstacle) {
+    sf::FloatRect eBounds = entity->getBounds();
+    sf::FloatRect oBounds = obstacle->getBounds();
+    sf::FloatRect overlap;
+
+
+    if (eBounds.intersects(oBounds, overlap)) {
+        // Wypychamy obiekt po krótszej osi przecięcia
+        if (overlap.width < overlap.height) {
+            if (eBounds.left < oBounds.left) entity->forceMove(-overlap.width, 0);
+            else entity->forceMove(overlap.width, 0);
+        } else {
+            if (eBounds.top < oBounds.top) entity->forceMove(0, -overlap.height);
+            else entity->forceMove(0, overlap.height);
+        }
+    }
+}
 
 using namespace std;
 
@@ -50,12 +71,27 @@ int main() {
 
     bool isGameWon = false;
     bool isGameOver = false;
+    bool portalSpawned = false;
+    float transitionTimer = 0.0f;
+
+
+
+    // Generowanie przeszkód dla poziomu 1
+    for (int i = 0; i < 5; i++) {
+        float w = 50.0f + (rand() % 100);
+        float h = 50.0f + (rand() % 100);
+        // Unikamy środka mapy (gdzie pojawia się gracz)
+        float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
+        float y = 100.0f + rand() % 500;
+        allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
+    }
 
     // Główna pętla
     while (window.isOpen()) {
 
-        float dt = clock.restart().asSeconds();
 
+        float dt = clock.restart().asSeconds();
+        bool playerEnteredPortal = false;
 
         sf::Event event;
         while (window.pollEvent(event)) {
@@ -80,25 +116,34 @@ int main() {
                 if (dynamic_cast<Enemy*>(obj.get())) activeEnemies++;
             }
 
+            // Jeśli pokonano wszystkich wrogów na obecnym poziomie:
             if (enemiesSpawnedSoFar >= enemiesToSpawnThisLevel && activeEnemies == 0) {
-                currentLevel++;
-                enemiesSpawnedSoFar = 0;
-
-                if (currentLevel == 2) enemiesToSpawnThisLevel = 5;
-                else if (currentLevel == 3) enemiesToSpawnThisLevel = 8;
-                else {
+                if (currentLevel < 3) {
+                    // Spawnuje portal tylko raz
+                    if (!portalSpawned) {
+                        allObjects.push_back(make_unique<Portal>(1280.0f / 2.0f, 720.0f / 2.0f));
+                        portalSpawned = true;
+                    }
+                } else {
+                    // Koniec gry na najwyższym poziomie
                     isGameWon = true;
                     if (hasFont) {
                         uiText.setCharacterSize(36);
                         uiText.setPosition(1280.0f / 4.0f, 720.0f / 3.0f);
-                        uiText.setString("GRATULACJE! UKONCZYLES CALA GRE!\nKONCOWY POZIOM: " + to_string(currentLevel - 1) + "\nZamknij okno, aby wyjsc.");
+                        uiText.setString("GRATULACJE! UKONCZYLES CALA GRE!\nKONCOWY POZIOM: " + to_string(currentLevel) + "\nZamknij okno, aby wyjsc.");
                     } else cout << "WYGRANA!" << endl;
                 }
             }
 
-            // Spawnowanie Przeciwników
-            if (enemiesSpawnedSoFar < enemiesToSpawnThisLevel) {
+            // Odejmujemy czas od licznika napisu
+            if (transitionTimer > 0.0f) {
+                transitionTimer -= dt;
+            }
+
+            // 3. Spawnowanie Przeciwników (dodany warunek transitionTimer <= 0.0f)
+            if (enemiesSpawnedSoFar < enemiesToSpawnThisLevel && transitionTimer <= 0.0f) {
                 if (enemySpawnClock.getElapsedTime().asSeconds() >= enemySpawnCooldown) {
+                    // ... (tutaj reszta Twojego kodu losująca pozycję i tworząca wroga) ...
                     float speed = 100.0f + (currentLevel * 20.0f);
                     int hp = 2;
 
@@ -110,6 +155,15 @@ int main() {
                     else if (edge == 2) { startX = -20; startY = rand() % 720; }
                     else                { startX = 1300; startY = rand() % 720; }
 
+
+                    if (currentLevel >= 2 && rand() % 100 < 30) {
+
+                        allObjects.push_back(make_unique<ShooterEnemy>(startX, startY, speed * 0.7f, hp));
+                    } else {
+
+                        allObjects.push_back(make_unique<Enemy>(startX, startY, speed, hp));
+                    }
+
                     allObjects.push_back(make_unique<Enemy>(startX, startY, speed, hp));
                     enemiesSpawnedSoFar++;
                     enemySpawnClock.restart();
@@ -119,10 +173,24 @@ int main() {
             // Strzelanie
             sf::Vector2f shootDir;
             if (player->tryShoot(shootDir)) {
-                allObjects.push_back(make_unique<Bullet>(player->getPosition().x, player->getPosition().y, shootDir, 420.0f));
+                allObjects.push_back(make_unique<Bullet>(player->getPosition().x, player->getPosition().y, shootDir, 420.0f, sf::Color::Cyan, false));
             }
 
+            //Strzelanie Przeciwników
+            vector<unique_ptr<GameObject>> enemyBullets;
+            for (auto& obj : allObjects) {
+                if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
+                    sf::Vector2f shootDir;
+                    if (e->tryShoot(shootDir)) {
+                        enemyBullets.push_back(make_unique<Bullet>(e->getPosition().x, e->getPosition().y, shootDir, 250.0f, sf::Color::Yellow, true));
+                    }
+                }
+            }
 
+            // Dodanie zebranych pocisków na mapę
+            for (auto& b : enemyBullets) {
+                allObjects.push_back(move(b));
+            }
             for (auto& obj : allObjects) {
                 if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
                     e->setTargetPosition(player->getPosition());
@@ -135,6 +203,26 @@ int main() {
             }
 
 
+            //FIZYKA BARYKAD
+
+
+
+
+
+            for (auto& obj : allObjects) {
+                if (Obstacle* obs = dynamic_cast<Obstacle*>(obj.get())) {
+                    // Sprawdzamy zderzenie gracza z tą przeszkodą
+                    resolveSolidCollision(player, obs);
+
+                    // Sprawdzamy zderzenie każdego wroga z tą przeszkodą
+                    for (auto& other : allObjects) {
+                        if (Enemy* e = dynamic_cast<Enemy*>(other.get())) {
+                            resolveSolidCollision(e, obs);
+                        }
+                    }
+                }
+            }
+
             for (auto it = allObjects.begin(); it != allObjects.end(); ) {
                 bool eraseObj = false;
 
@@ -146,24 +234,54 @@ int main() {
                     if (e->getHp() <= 0) eraseObj = true; // Wróg zginął
                 }
 
+
                 else if (Bullet* b = dynamic_cast<Bullet*>(it->get())) {
                     sf::Vector2f pos = b->getPosition();
-                    if (pos.x < 0 || pos.x > 1280 || pos.y < 0 || pos.y > 720) {
-                        eraseObj = true; // Usuwamy pocisk, który wyleciał za mapę
+                    bool hitObstacle = false;
+
+                    // Najpierw sprawdzamy, czy pocisk uderzył w ścianę
+                    for (auto& other : allObjects) {
+                        if (Obstacle* obs = dynamic_cast<Obstacle*>(other.get())) {
+                            if (b->getBounds().intersects(obs->getBounds())) {
+                                hitObstacle = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (pos.x < 0 || pos.x > 1280 || pos.y < 0 || pos.y > 720 || hitObstacle) {
+                        eraseObj = true; // Usuwamy pocisk, bo wybuchł na przeszkodzie lub wyleciał z mapy
                     } else {
-                        // kolizja pocisku ze wszystkimi innymi obiektami
-                        for (auto& other : allObjects) {
-                            if (Enemy* e = dynamic_cast<Enemy*>(other.get())) {
-                                if (e->getHp() > 0 && e->getBounds().intersects(b->getBounds())) {
-                                    e->takeDamage(1);
-                                    eraseObj = true; // Usuwamy pocisk po trafieniu
-                                    break;
+
+                        if (b->isEnemyBullet) {
+                            // POCISK WROGA - rani tylko gracza
+                            if (b->getBounds().intersects(player->getBounds())) {
+                                player->takeDamage(1);
+                                eraseObj = true;
+                            }
+                        } else {
+                            // POCISK GRACZA - rani wrogów
+                            for (auto& other : allObjects) {
+                                if (Enemy* e = dynamic_cast<Enemy*>(other.get())) {
+                                    if (e->getHp() > 0 && e->getBounds().intersects(b->getBounds())) {
+                                        e->takeDamage(1);
+                                        eraseObj = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
+
+
+                else if (Portal* p = dynamic_cast<Portal*>(it->get())) {
+                    if (p->getBounds().intersects(player->getBounds())) {
+                        playerEnteredPortal = true;
+                        eraseObj = true;
+                    }
+                }
 
                 if (eraseObj) {
                     it = allObjects.erase(it);
@@ -181,18 +299,63 @@ int main() {
             }
         }
 
+
+
+        if (playerEnteredPortal) {
+            currentLevel++;
+            enemiesSpawnedSoFar = 0;
+            portalSpawned = false;
+            transitionTimer = 2.0f;
+
+            if (currentLevel == 2) enemiesToSpawnThisLevel = 5;
+            else if (currentLevel == 3) enemiesToSpawnThisLevel = 8;
+
+            // USUWANIE starych przeszkód i pocisków
+            for (auto it = allObjects.begin(); it != allObjects.end(); ) {
+                if (dynamic_cast<Obstacle*>(it->get()) || dynamic_cast<Bullet*>(it->get())) {
+                    it = allObjects.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+
+            // GENEROWANIE przeszkód
+            for (int i = 0; i < 4 + currentLevel; i++) {
+                float w = 50.0f + (rand() % 100);
+                float h = 50.0f + (rand() % 100);
+                float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
+                float y = 100.0f + rand() % 500;
+                allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
+            }
+        }
+
+
         // --- RYSOWANIE ---
         window.clear(sf::Color(30, 30, 30));
-
 
         if (!isGameWon && !isGameOver) {
             for (auto& obj : allObjects) {
                 obj->draw(window);
             }
-
         }
 
-        if (hasFont) window.draw(uiText);
+        if (hasFont) {
+            window.draw(uiText); // Rysuje zwykłe statystyki w lewym górnym rogu
+
+            // Rysuje wielki napis na środku, jeśli licznik działa
+            if (transitionTimer > 0.0f) {
+                sf::Text transitionText;
+                transitionText.setFont(font);
+                transitionText.setCharacterSize(50);
+                transitionText.setFillColor(sf::Color::Yellow);
+                transitionText.setString("PRZECHODZISZ NA POZIOM " + to_string(currentLevel) + "!");
+
+                // Wyśrodkowanie tekstu na oko
+                transitionText.setPosition(1280.0f / 2.0f - 350.0f, 720.0f / 2.0f - 50.0f);
+
+                window.draw(transitionText);
+            }
+        }
 
         window.display();
     }

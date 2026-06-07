@@ -20,7 +20,7 @@ public:
 
     virtual void update(float dt) = 0;
     virtual void draw(sf::RenderWindow& window) = 0;
-
+    void forceMove(float dx, float dy);
     
     sf::Vector2f getPosition() const;
     sf::FloatRect getBounds() const;
