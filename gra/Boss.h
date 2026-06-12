@@ -9,7 +9,6 @@ private:
     float phaseTimer;
     float sprayAngle;
 
-    // Nowe zmienne dla faz 2 i 3:
     float sprinklerAngle;
     bool hasSummonedThisPhase;
 
@@ -20,5 +19,5 @@ public:
     void update(float dt) override;
     bool tryShoot(sf::Vector2f& outDirection) override;
 
-    bool trySummon() override; // Zgoda na nadpisanie funkcji przywoływania
+    bool trySummon() override;
 };

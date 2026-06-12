@@ -18,8 +18,13 @@ Enemy::Enemy(float startX, float startY, float startSpeed, int startHp)
     shape.setSize(sf::Vector2f(40.0f, 40.0f));
     shape.setOrigin(20.0f, 20.0f);
     if (texture.loadFromFile("enemy.png")) {
+        texture.setSmooth(false);
         sprite.setTexture(texture);
-        sprite.setOrigin(25.0f, 25.0f);
+
+        float scaleX = shape.getSize().x / texture.getSize().x;
+        float scaleY = shape.getSize().y / texture.getSize().y;
+        sprite.setScale(scaleX, scaleY);
+        sprite.setOrigin(texture.getSize().x / 2.0f, texture.getSize().y / 2.0f);
     }
 }
 

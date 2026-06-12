@@ -14,6 +14,9 @@
 #include "Obstacle.h"
 #include "Boss.h"
 
+using namespace std;
+
+//system kolizji
 void resolveSolidCollision(GameObject* entity, GameObject* obstacle) {
     sf::FloatRect eBounds = entity->getBounds();
     sf::FloatRect oBounds = obstacle->getBounds();
@@ -30,10 +33,10 @@ void resolveSolidCollision(GameObject* entity, GameObject* obstacle) {
     }
 }
 
-using namespace std;
-
 int main() {
+
     srand(time(NULL));
+
     sf::RenderWindow window(sf::VideoMode(1280, 720), "Lochy Uwalonych");
     window.setFramerateLimit(60);
 
@@ -43,41 +46,43 @@ int main() {
         cout << "UWAGA: Nie znaleziono pliku arial.ttf." << endl;
     }
 
+    // GŁÓWNY KONTENER GRY
     vector<unique_ptr<GameObject>> allObjects;
 
+    // Tworzenie gracza
     auto playerPtr = make_unique<Student>(1280.0f / 2.0f, 720.0f / 2.0f);
     Student* player = playerPtr.get();
     allObjects.push_back(move(playerPtr));
+
 
     sf::Clock clock;
     sf::Clock enemySpawnClock;
     float enemySpawnCooldown = 1.5f;
 
+
     int currentLevel = 1;
     int enemiesToSpawnThisLevel = 3;
     int enemiesSpawnedSoFar = 0;
+
 
     bool isGameWon = false;
     bool isGameOver = false;
     bool portalSpawned = false;
     float transitionTimer = 0.0f;
-
-    // Stany gry
     bool inMainMenu = true;
     bool isPaused = false;
     bool inUpgradeMenu = false;
 
-    // Metaprogresja i Boosty
+
     bool buffDoubleSpeed = false;
     bool buffDoubleDamage = false;
     bool unlockedNewStudent = false;
     bool playAsNewStudent = false;
-
-    // NOWE BOOSTY DLA NOWEGO STUDENTA
     bool buffL4 = false;
     bool buffSciaga = false;
     bool buffDziekanka = false;
 
+    //INTERFEJS
     sf::Text uiText;
     if (hasFont) {
         uiText.setFont(font);
@@ -86,10 +91,9 @@ int main() {
         uiText.setPosition(20.0f, 20.0f);
     }
 
-    // --- ELEMENTY MENU STARTOWEGO ---
     sf::Text titleText, controlsText, startButtonText, unlockText, newStudentBtnText;
     sf::RectangleShape startButton(sf::Vector2f(250.0f, 60.0f));
-    sf::RectangleShape newStudentButton(sf::Vector2f(380.0f, 60.0f)); // Poszerzony przycisk
+    sf::RectangleShape newStudentButton(sf::Vector2f(380.0f, 60.0f));
 
     if (hasFont) {
         titleText.setFont(font);
@@ -101,7 +105,7 @@ int main() {
         controlsText.setFont(font);
         controlsText.setCharacterSize(26);
         controlsText.setFillColor(sf::Color::White);
-        controlsText.setString("STEROWANIE:\nWSAD - Poruszanie sie\nSpacja - Dash\nStrzalki - strzelanie\n\nCel: Przetrwaj 4 pokoje i pokonaj Krola Warunkow!");
+        controlsText.setString("STEROWANIE:\nWSAD - Poruszanie sie\nSpacja - Dash\nStrzalki - Strzelanie\nESC-Pauza\n\nCel: Przetrwaj 4 pokoje i pokonaj Krola Warunkow!");
         controlsText.setPosition(1280.0f / 2.0f - 300.0f, 250.0f);
 
         startButton.setFillColor(sf::Color(0, 150, 0));
@@ -112,7 +116,7 @@ int main() {
 
         newStudentButton.setFillColor(sf::Color(150, 0, 150));
         newStudentBtnText.setFont(font);
-        newStudentBtnText.setCharacterSize(20); // Zmniejszona czcionka dla lepszego dopasowania
+        newStudentBtnText.setCharacterSize(20);
         newStudentBtnText.setFillColor(sf::Color::White);
         newStudentBtnText.setString("STUDENT DRUGIEGO STOPNIA\n(1 HP, Dmg x3)");
 
@@ -122,7 +126,6 @@ int main() {
         unlockText.setString("Gra ukonczona - odblokowano nowego studenta!");
     }
 
-    // --- ELEMENTY EKRANU KOŃCOWEGO ---
     sf::RectangleShape returnButton(sf::Vector2f(300.0f, 60.0f));
     sf::Text returnBtnText;
     if (hasFont) {
@@ -135,7 +138,6 @@ int main() {
         returnBtnText.setPosition(1280.0f / 2.0f - 90.0f, 515.0f);
     }
 
-    // --- ELEMENTY PAUZY ---
     sf::RectangleShape pauseOverlay(sf::Vector2f(1280.0f, 720.0f));
     sf::Text pauseText;
     if (hasFont) {
@@ -147,7 +149,6 @@ int main() {
         pauseText.setPosition(1280.0f / 2.0f - 250.0f, 720.0f / 2.0f - 50.0f);
     }
 
-    // --- ELEMENTY MENU ULEPSZEŃ ---
     sf::Text upgTitle, upgText1, upgText2, upgText3;
     sf::RectangleShape upgBtn1(sf::Vector2f(280.0f, 180.0f));
     sf::RectangleShape upgBtn2(sf::Vector2f(280.0f, 180.0f));
@@ -162,10 +163,8 @@ int main() {
 
         upgBtn1.setPosition(150.0f, 300.0f);
         upgBtn1.setFillColor(sf::Color(180, 30, 30));
-
         upgBtn2.setPosition(500.0f, 300.0f);
         upgBtn2.setFillColor(sf::Color(100, 50, 20));
-
         upgBtn3.setPosition(850.0f, 300.0f);
         upgBtn3.setFillColor(sf::Color(80, 20, 150));
 
@@ -174,7 +173,7 @@ int main() {
         upgText3.setFont(font); upgText3.setCharacterSize(24); upgText3.setFillColor(sf::Color::White);
     }
 
-    // Generowanie początkowych przeszkód
+    // Losowe generowanie początkowych przeszkód na planszy
     for (int i = 0; i < 5; i++) {
         float w = 50.0f + (rand() % 100); float h = 50.0f + (rand() % 100);
         float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
@@ -182,14 +181,29 @@ int main() {
         allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
     }
 
-    // ==========================================
-    //            GŁÓWNA PĘTLA GRY
-    // ==========================================
+    // Wczytanie grafiki podłogi
+    sf::Texture bgTexture;
+    sf::Sprite bgSprite;
+    if (bgTexture.loadFromFile("background.png")) {
+        bgTexture.setSmooth(false);
+        bgSprite.setTexture(bgTexture);
+
+        // Skalowanie tła
+        float scaleX = 1280.0f / bgTexture.getSize().x;
+        float scaleY = 720.0f / bgTexture.getSize().y;
+        bgSprite.setScale(scaleX, scaleY);
+    }
+
+
+    // GŁÓWNA PĘTLA
+
     while (window.isOpen()) {
 
+        //dt-klatka
         float dt = clock.restart().asSeconds();
         bool playerEnteredPortal = false;
 
+        //OBSŁUGA ZDARZEŃ
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed) window.close();
@@ -198,7 +212,7 @@ int main() {
             float mx = static_cast<float>(mousePos.x);
             float my = static_cast<float>(mousePos.y);
 
-            // Obsługa kliknięć w MENU GŁÓWNYM
+            // Obsługa kliknięć w Menu Głównym
             if (inMainMenu && event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
                 if (startButton.getGlobalBounds().contains(mx, my)) {
                     playAsNewStudent = false;
@@ -207,6 +221,9 @@ int main() {
                     playAsNewStudent = true;
                     inMainMenu = false; clock.restart();
 
+                    player->applySecondDegreeTexture();
+
+                    // zmiana hp dla 2. postaci
                     int failsafe = 0;
                     while(player->getHp() > 1 && failsafe < 10) {
                         player->takeDamage(1);
@@ -216,33 +233,37 @@ int main() {
                 }
             }
 
-            // Obsługa kliknięć na EKRANIE KOŃCOWYM
+            //ekran koncowy
             if ((isGameOver || isGameWon) && event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
                 if (returnButton.getGlobalBounds().contains(mx, my)) {
                     if (isGameWon) unlockedNewStudent = true;
 
+                    //reset stanu gry
                     isGameOver = false;
                     isGameWon = false;
                     inMainMenu = true;
-
                     currentLevel = 1;
                     enemiesToSpawnThisLevel = 3;
                     enemiesSpawnedSoFar = 0;
                     transitionTimer = 0.0f;
                     portalSpawned = false;
 
-                    // Reset wszystkich boostów obu postaci
                     buffDoubleSpeed = false;
                     buffDoubleDamage = false;
                     buffL4 = false;
                     buffSciaga = false;
                     buffDziekanka = false;
 
+
                     allObjects.clear();
                     auto newPlayerPtr = make_unique<Student>(1280.0f / 2.0f, 720.0f / 2.0f);
                     player = newPlayerPtr.get();
+
+                    if (playAsNewStudent) player->applySecondDegreeTexture();
+
                     allObjects.push_back(move(newPlayerPtr));
 
+                    //losowe przeszkody
                     for (int i = 0; i < 5; i++) {
                         float w = 50.0f + (rand() % 100); float h = 50.0f + (rand() % 100);
                         float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
@@ -253,7 +274,7 @@ int main() {
                 }
             }
 
-            // Klikanie w Ekranie Ulepszeń
+            // Obsluga ulepszen
             if (inUpgradeMenu && event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
                 if (upgBtn1.getGlobalBounds().contains(mx, my)) {
                     if (playAsNewStudent) buffL4 = true; else player->heal(1);
@@ -267,7 +288,7 @@ int main() {
                 }
             }
 
-            // Obsługa klawisza ESC (Pauza)
+            // Pauzowanie gry
             if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
                 if (!inMainMenu && !inUpgradeMenu && !isGameOver && !isGameWon) {
                     isPaused = !isPaused;
@@ -276,7 +297,7 @@ int main() {
             }
         }
 
-        // --- EKRANY ZAMRAŻAJĄCE GRĘ ---
+        //RYSOWANIE EKRANOW
         if (inMainMenu) {
             window.clear(sf::Color(20, 20, 20));
             if (hasFont) {
@@ -292,7 +313,7 @@ int main() {
                     startButtonText.setPosition(1280.0f / 2.0f - 275.0f, 535.0f);
 
                     newStudentButton.setPosition(1280.0f / 2.0f + 50.0f, 520.0f);
-                    newStudentBtnText.setPosition(1280.0f / 2.0f + 65.0f, 525.0f); // Dopasowane koordynaty tekstu
+                    newStudentBtnText.setPosition(1280.0f / 2.0f + 65.0f, 525.0f);
 
                     unlockText.setPosition(1280.0f / 2.0f - 270.0f, 460.0f);
 
@@ -317,28 +338,25 @@ int main() {
         if (inUpgradeMenu) {
             window.clear(sf::Color(30, 20, 40));
             if (hasFont) {
+                //ulepszenia dla 2. studenta
                 if (playAsNewStudent) {
                     upgText1.setString("ZWOLNIENIE L4\n\nIgnoruje pierwszy\ncios na poziomie!");
                     upgText1.setPosition(165.0f, 320.0f);
-
                     upgText2.setString("SCIAGA\n\nPociski przenikaja\nprzez sciany!");
                     upgText2.setPosition(515.0f, 320.0f);
-
                     upgText3.setString("DZIEKANKA\n\nWrogowie i pociski\nzwalniaja o 50%!");
                     upgText3.setPosition(865.0f, 320.0f);
                 } else {
+                    //dla pierwszego
                     upgText1.setString("SERDUSZKO\n\nLeczy +1 HP\nOd razu!");
                     upgText1.setPosition(170.0f, 320.0f);
-
                     upgText2.setString("MOCNA KAWA\n\nPredkosc x1.5\n(Tylko ten poziom)");
                     upgText2.setPosition(520.0f, 320.0f);
-
                     upgText3.setString("FURIA\n\nObrazenia x2\n(Tylko ten poziom)");
                     upgText3.setPosition(870.0f, 320.0f);
                 }
 
                 window.draw(upgTitle);
-
                 sf::Vector2i mPos = sf::Mouse::getPosition(window);
                 upgBtn1.setOutlineThickness(upgBtn1.getGlobalBounds().contains(mPos.x, mPos.y) ? 5.0f : 0.0f);
                 upgBtn2.setOutlineThickness(upgBtn2.getGlobalBounds().contains(mPos.x, mPos.y) ? 5.0f : 0.0f);
@@ -352,8 +370,9 @@ int main() {
             continue;
         }
 
-        // --- GŁÓWNA LOGIKA GRY ---
+        //GLOWNA LOGIKA GRY
         if (!isGameWon && !isGameOver && !isPaused) {
+
 
             if (player->getHp() <= 0) {
                 isGameOver = true;
@@ -364,11 +383,13 @@ int main() {
                 }
             }
 
+            // Liczenie wrogów
             int activeEnemies = 0;
             for (auto& obj : allObjects) {
                 if (dynamic_cast<Enemy*>(obj.get())) activeEnemies++;
             }
 
+            // Pojawienie się portalu
             if (enemiesSpawnedSoFar >= enemiesToSpawnThisLevel && activeEnemies == 0) {
                 if (!portalSpawned) {
                     allObjects.push_back(make_unique<Portal>(1280.0f / 2.0f, 720.0f / 2.0f));
@@ -378,18 +399,20 @@ int main() {
 
             if (transitionTimer > 0.0f) transitionTimer -= dt;
 
-            // Spawnowanie Wrogów
+            // Logika spawnowania nowych przeciwników
             if (enemiesSpawnedSoFar < enemiesToSpawnThisLevel && transitionTimer <= 0.0f) {
                 if (enemySpawnClock.getElapsedTime().asSeconds() >= enemySpawnCooldown) {
                     float speed = 100.0f + (currentLevel * 20.0f);
                     int hp = 2;
                     int edge = rand() % 4;
                     float startX = 0, startY = 0;
+
                     if (edge == 0)      { startX = rand() % 1280; startY = -20; }
                     else if (edge == 1) { startX = rand() % 1280; startY = 740; }
                     else if (edge == 2) { startX = -20; startY = rand() % 720; }
                     else                { startX = 1300; startY = rand() % 720; }
 
+                    // losowosc klas enemy
                     if (currentLevel >= 2 && rand() % 100 < 30) {
                         allObjects.push_back(make_unique<ShooterEnemy>(startX, startY, speed * 0.7f, hp));
                     } else {
@@ -400,12 +423,13 @@ int main() {
                 }
             }
 
-            // Strzelanie
+            // Strzelanie gracz
             sf::Vector2f shootDir;
             if (player->tryShoot(shootDir)) {
                 allObjects.push_back(make_unique<Bullet>(player->getPosition().x, player->getPosition().y, shootDir, 420.0f, sf::Color::Cyan, false));
             }
 
+            // Strzelanie wrog
             vector<unique_ptr<GameObject>> enemyBullets;
             for (auto& obj : allObjects) {
                 if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
@@ -417,7 +441,7 @@ int main() {
             }
             for (auto& b : enemyBullets) allObjects.push_back(move(b));
 
-            // Sługusy Bossa
+            // slugusy bossa
             vector<unique_ptr<GameObject>> summonedEnemies;
             for (auto& obj : allObjects) {
                 if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
@@ -430,32 +454,34 @@ int main() {
             }
             for (auto& newEnemy : summonedEnemies) allObjects.push_back(move(newEnemy));
 
+            // aktualizacja celu dla wrogow
             for (auto& obj : allObjects) {
                 if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
                     e->setTargetPosition(player->getPosition());
                 }
             }
 
-            // --- SYSTEM AKTUALIZACJI FIZYKI (Z KAWĄ I DZIEKANKĄ) ---
+            //MODYFIKATORY CZASU
             for (auto& obj : allObjects) {
                 float timeModifier = 1.0f;
 
                 if (obj.get() == player && buffDoubleSpeed) {
-                    timeModifier = 1.5f;
+                    timeModifier = 1.5f; // Kawa przyspiesza gracza
                 }
                 else if (dynamic_cast<Enemy*>(obj.get()) && buffDziekanka) {
-                    timeModifier = 0.5f;
+                    timeModifier = 0.5f; // Dziekanka zwalnia wrogów
                 }
                 else if (Bullet* b = dynamic_cast<Bullet*>(obj.get())) {
                     if (b->isEnemyBullet && buffDziekanka) {
-                        timeModifier = 0.5f;
+                        timeModifier = 0.5f; // Dziekanka zwalnia wrogie pociski
                     }
                 }
 
+                // wywolanie aktualizacji dla kazdego obiektu
                 obj->update(dt * timeModifier);
             }
 
-            // Fizyka Barykad
+            //kolizja
             for (auto& obj : allObjects) {
                 if (Obstacle* obs = dynamic_cast<Obstacle*>(obj.get())) {
                     resolveSolidCollision(player, obs);
@@ -467,13 +493,14 @@ int main() {
                 }
             }
 
-            // Zderzenia i Usuwanie
+            //SYSTEM ZDERZEŃ I USUWANIA
             for (auto it = allObjects.begin(); it != allObjects.end(); ) {
                 bool eraseObj = false;
 
+                // zadawanie obrazen
                 if (Enemy* e = dynamic_cast<Enemy*>(it->get())) {
                     if (e->getBounds().intersects(player->getBounds())) {
-                        if (buffL4) {
+                        if (buffL4) { // Użycie tarczy z L4
                             buffL4 = false;
                             player->takeDamage(1); player->heal(1);
                         } else {
@@ -482,6 +509,7 @@ int main() {
                     }
                     if (e->getHp() <= 0) eraseObj = true;
                 }
+                // logika pociskow
                 else if (Bullet* b = dynamic_cast<Bullet*>(it->get())) {
                     sf::Vector2f pos = b->getPosition();
                     bool hitObstacle = false;
@@ -490,7 +518,7 @@ int main() {
                         if (Obstacle* obs = dynamic_cast<Obstacle*>(other.get())) {
                             if (b->getBounds().intersects(obs->getBounds())) {
                                 if (buffSciaga && !b->isEnemyBullet) {
-                                    break;
+                                    break; //strzelanie przez sciany
                                 }
                                 hitObstacle = true; break;
                             }
@@ -511,11 +539,10 @@ int main() {
                                 eraseObj = true;
                             }
                         } else {
-                            // POCISK GRACZA - OBLICZANIE OBRAŻEŃ
+                            // sprawdzanie trafienia wroga
                             for (auto& other : allObjects) {
                                 if (Enemy* e = dynamic_cast<Enemy*>(other.get())) {
                                     if (e->getHp() > 0 && e->getBounds().intersects(b->getBounds())) {
-
                                         int finalDamage = 1;
                                         if (buffDoubleDamage) finalDamage *= 2;
                                         if (playAsNewStudent) finalDamage *= 3;
@@ -529,6 +556,7 @@ int main() {
                         }
                     }
                 }
+                //Portal
                 else if (Portal* p = dynamic_cast<Portal*>(it->get())) {
                     if (p->getBounds().intersects(player->getBounds())) {
                         playerEnteredPortal = true;
@@ -540,11 +568,13 @@ int main() {
                 else ++it;
             }
 
+            // HUD
             if (hasFont && !isGameOver && !isGameWon) {
                 uiText.setCharacterSize(24);
                 uiText.setPosition(20.0f, 20.0f);
                 int remainingEnemies = (enemiesToSpawnThisLevel - enemiesSpawnedSoFar) + activeEnemies;
                 string activeBuffs = "";
+
                 if (buffDoubleSpeed) activeBuffs += "\nAKTYWNY BOOST: Kawa (x1.5 Ruch)";
                 if (buffDoubleDamage) activeBuffs += "\nAKTYWNY BOOST: Furia (x2 Obrazenia)";
                 if (buffL4) activeBuffs += "\nAKTYWNY BOOST: Zwolnienie L4 (Tarcza aktywna)";
@@ -557,7 +587,7 @@ int main() {
             }
         }
 
-        // --- ZMIANA POZIOMU / KONIEC GRY ---
+        // ZMIANY POZIOMU I WYGRANA
         if (playerEnteredPortal) {
             if (currentLevel == 5) {
                 isGameWon = true;
@@ -572,6 +602,7 @@ int main() {
                 portalSpawned = false;
                 transitionTimer = 2.0f;
 
+                // reset buff
                 buffDoubleSpeed = false;
                 buffDoubleDamage = false;
                 buffL4 = false;
@@ -585,19 +616,19 @@ int main() {
                 else if (currentLevel == 4) enemiesToSpawnThisLevel = 12;
                 else if (currentLevel == 5) {
                     enemiesToSpawnThisLevel = 1;
-
-                    // --- ZMIANA HP BOSSA W ZALEŻNOŚCI OD POSTACI ---
                     int bossHp = playAsNewStudent ? 100 : 50;
                     allObjects.push_back(make_unique<Boss>(1280.0f / 2.0f, 150.0f, bossHp));
                     enemiesSpawnedSoFar = 1;
                 }
 
+                // Usuwanie smieci
                 for (auto it = allObjects.begin(); it != allObjects.end(); ) {
                     if (dynamic_cast<Obstacle*>(it->get()) || dynamic_cast<Bullet*>(it->get())) {
                         it = allObjects.erase(it);
                     } else ++it;
                 }
 
+                // nowe przeszkody
                 if(currentLevel != 5){
                     for (int i = 0; i < 5; i++) {
                         float w = 50.0f + (rand() % 100); float h = 50.0f + (rand() % 100);
@@ -611,10 +642,12 @@ int main() {
             }
         }
 
-        // --- RYSOWANIE ---
+        //RENDEROWANIE
         window.clear(sf::Color(30, 30, 30));
 
         if (!isGameWon && !isGameOver) {
+            window.draw(bgSprite);
+
             for (auto& obj : allObjects) obj->draw(window);
         }
 
@@ -631,6 +664,7 @@ int main() {
                 window.draw(transitionText);
             }
 
+            // pasek zycia bossa
             if (currentLevel == 5 && !isGameWon && !isGameOver) {
                 Boss* bossPtr = nullptr;
                 for (auto& obj : allObjects) {

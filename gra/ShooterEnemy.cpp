@@ -2,7 +2,7 @@
 #include <cmath>
 
 ShooterEnemy::ShooterEnemy(float startX, float startY, float startSpeed, int startHp)
-    : Enemy(startX, startY, startSpeed, startHp) { // Wywołujemy konstruktor rodzica
+    : Enemy(startX, startY, startSpeed, startHp) {
 
 
     circleShape.setFillColor(sf::Color(255, 128, 0));
@@ -10,8 +10,13 @@ ShooterEnemy::ShooterEnemy(float startX, float startY, float startSpeed, int sta
     shootTimer = shootCooldown;
 
     if (texture.loadFromFile("shooter.png")) {
+        texture.setSmooth(false);
         sprite.setTexture(texture);
-        sprite.setOrigin(25.0f, 25.0f);
+
+        float scaleX = shape.getSize().x / texture.getSize().x;
+        float scaleY = shape.getSize().y / texture.getSize().y;
+        sprite.setScale(scaleX, scaleY);
+        sprite.setOrigin(texture.getSize().x / 2.0f, texture.getSize().y / 2.0f);
     }
 }
 
@@ -25,7 +30,7 @@ void ShooterEnemy::update(float dt) {
 
 bool ShooterEnemy::tryShoot(sf::Vector2f& outDirection) {
     if (shootTimer <= 0.0f) {
-        // Obliczamy wektor strzału idealnie w stronę gracza
+        //wektor strzalu w strone gracza
         sf::Vector2f direction = targetPosition - position;
         float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y);
 
@@ -34,7 +39,7 @@ bool ShooterEnemy::tryShoot(sf::Vector2f& outDirection) {
         }
 
         outDirection = direction;
-        shootTimer = shootCooldown; // Resetujemy licznik
+        shootTimer = shootCooldown;
         return true;
     }
     return false;

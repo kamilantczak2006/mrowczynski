@@ -8,9 +8,7 @@ private:
     sf::CircleShape circleShape;
 
 public:
-    bool isEnemyBullet; // NOWE
-
-    // Zmieniony konstruktor:
+    bool isEnemyBullet;
     Bullet(float startX, float startY, sf::Vector2f dir, float bulletSpeed, sf::Color color, bool enemyBullet);
 
     void update(float dt) override;

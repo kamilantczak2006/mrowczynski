@@ -36,4 +36,5 @@ public:
 
     bool tryShoot(sf::Vector2f& outDirection);
     void heal(int amount);
+    void applySecondDegreeTexture();
 };

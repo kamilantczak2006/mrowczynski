@@ -6,10 +6,10 @@ Bullet::Bullet(float startX, float startY, sf::Vector2f dir, float bulletSpeed, 
     : GameObject(startX, startY, bulletSpeed) {
 
     velocity = dir * speed;
-    isEnemyBullet = enemyBullet; // Zapisujemy, czyj to pocisk
+    isEnemyBullet = enemyBullet;
 
     circleShape.setRadius(6.0f);
-    circleShape.setFillColor(color); // Ustawiamy podany kolor!
+    circleShape.setFillColor(color);
     circleShape.setOrigin(6.0f, 6.0f);
     circleShape.setPosition(position);
 

@@ -21,12 +21,21 @@ Student::Student(float startX, float startY)
 
     shape.setSize(sf::Vector2f(50.0f, 50.0f));
     shape.setFillColor(sf::Color::Green);
-    shape.setOrigin(25.0f, 25.0f); // Ustawienie punktu centralnego
+    shape.setOrigin(25.0f, 25.0f);
     shape.setPosition(position);
 
     if (texture.loadFromFile("student.png")) {
+        texture.setSmooth(false);
+
         sprite.setTexture(texture);
-        sprite.setOrigin(25.0f, 25.0f); // Ustawiamy środek obrazka
+
+        // Skalowanie do hitboxa
+        float scaleX = shape.getSize().x / texture.getSize().x;
+        float scaleY = shape.getSize().y / texture.getSize().y;
+        sprite.setScale(scaleX, scaleY);
+
+        // Ustawienie na srodku
+        sprite.setOrigin(texture.getSize().x / 2.0f, texture.getSize().y / 2.0f);
     }
 }
 
@@ -94,7 +103,7 @@ int Student::getHp() const {
 }
 
 bool Student::tryShoot(sf::Vector2f& outDirection) {
-    // Jeśli cooldown jeszcze trwa, nie możemy strzelić
+    //cooldown
     if (shootCooldownTimer > 0.0f) return false;
 
     bool isShooting = false;
@@ -114,4 +123,20 @@ bool Student::tryShoot(sf::Vector2f& outDirection) {
 }
 void Student::heal(int amount) {
     hp += amount;
+}
+void Student::applySecondDegreeTexture() {
+    if (texture.loadFromFile("student2.png")) {
+        texture.setSmooth(false); //wyostrza pixele
+        sprite.setTexture(texture);
+
+        // Zabezpieczenie przed ucięciem obrazka
+        sprite.setTextureRect(sf::IntRect(0, 0, texture.getSize().x, texture.getSize().y));
+
+        // Dopasowanie do hitboxa
+        float scaleX = shape.getSize().x / texture.getSize().x;
+        float scaleY = shape.getSize().y / texture.getSize().y;
+        sprite.setScale(scaleX, scaleY);
+
+        sprite.setOrigin(texture.getSize().x / 2.0f, texture.getSize().y / 2.0f);
+    }
 }

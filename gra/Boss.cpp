@@ -23,8 +23,15 @@ Boss::Boss(float startX, float startY, int startHp)
     sprinklerAngle = 0.0f;
     hasSummonedThisPhase = false;
     if (texture.loadFromFile("boss.png")) {
+        texture.setSmooth(false);
         sprite.setTexture(texture);
-        sprite.setOrigin(50.0f, 50.0f);
+        sprite.setTextureRect(sf::IntRect(0, 0, texture.getSize().x, texture.getSize().y));
+
+        float scaleX = shape.getSize().x / texture.getSize().x;
+        float scaleY = shape.getSize().y / texture.getSize().y;
+        sprite.setScale(scaleX, scaleY);
+        sprite.setOrigin(texture.getSize().x / 2.0f, texture.getSize().y / 2.0f);
+        sprite.setPosition(position);
     }
 }
 
@@ -33,31 +40,30 @@ void Boss::update(float dt) {
 
     phaseTimer -= dt;
     if (phaseTimer <= 0.0f) {
-        phase = (phase + 1) % 4; // Teraz mamy 4 fazy! (0, 1, 2, 3)
-        phaseTimer = 4.0f;       // Każda trwa 4 sekundy
-
-        if (phase == 0) shootCooldown = 0.8f;      // Faza 0: Snajper
-        else if (phase == 1) shootCooldown = 0.15f; // Faza 1: Karuzela
-        else if (phase == 2) shootCooldown = 0.08f; // Faza 2: CKM / Wężyk (Bardzo szybko!)
+        phase = (phase + 1) % 4;
+        phaseTimer = 4.0f;
+        if (phase == 0) shootCooldown = 0.8f;
+        else if (phase == 1) shootCooldown = 0.15f; //Karuzela strzałów
+        else if (phase == 2) shootCooldown = 0.08f; //rozbrysk
         else if (phase == 3) {
-            shootCooldown = 99.0f;        // Faza 3: Boss nie strzela, skupia się na magii
-            hasSummonedThisPhase = false; // Resetujemy flagę przywołania dla tej fazy
+            shootCooldown = 99.0f;        // spawn sług
+            hasSummonedThisPhase = false;
         }
         sprite.setPosition(position);
     }
 
     if (phase == 1) sprayAngle += 3.0f * dt;
-    if (phase == 2) sprinklerAngle += 8.0f * dt; // Szybkie machanie lufą na boki
+    if (phase == 2) sprinklerAngle += 8.0f * dt;
 }
 
 bool Boss::tryShoot(sf::Vector2f& outDirection) {
-    if (phase == 3) return false; // W fazie 3 (Nekromanta) nie strzelamy
+    if (phase == 3) return false;
 
     if (shootTimer <= 0.0f) {
         shootTimer = shootCooldown;
 
         if (phase == 0) {
-            // Snajper
+            // zwykły
             sf::Vector2f dir = targetPosition - position;
             float dist = std::sqrt(dir.x * dir.x + dir.y * dir.y);
             if (dist != 0) dir /= dist;
@@ -66,10 +72,10 @@ bool Boss::tryShoot(sf::Vector2f& outDirection) {
             // Karuzela
             outDirection = sf::Vector2f(std::cos(sprayAngle), std::sin(sprayAngle));
         } else if (phase == 2) {
-            // Wężyk - celuje w gracza, ale nakładamy na to funkcję sinus (falę)
+
             sf::Vector2f dir = targetPosition - position;
             float baseAngle = std::atan2(dir.y, dir.x);
-            float offset = std::sin(sprinklerAngle) * 0.6f; // Rozrzut na boki
+            float offset = std::sin(sprinklerAngle) * 0.6f; // rozbrysk
             float finalAngle = baseAngle + offset;
             outDirection = sf::Vector2f(std::cos(finalAngle), std::sin(finalAngle));
         }
@@ -78,11 +84,10 @@ bool Boss::tryShoot(sf::Vector2f& outDirection) {
     return false;
 }
 
-// Funkcja pytana przez główną pętlę gry
+
 bool Boss::trySummon() {
-    // Jeśli jesteśmy w fazie 3 i odczekaliśmy 1 sekundę na "naładowanie" ataku
     if (phase == 3 && phaseTimer < 3.0f && !hasSummonedThisPhase) {
-        hasSummonedThisPhase = true; // Żeby nie przywoływać ich co klatkę!
+        hasSummonedThisPhase = true;
         return true;
     }
     return false;

@@ -5,6 +5,8 @@
 class Portal : public GameObject {
 private:
     sf::RectangleShape portalShape;
+    sf::Texture texture;
+    sf::Sprite sprite;
 
 public:
     Portal(float startX, float startY);

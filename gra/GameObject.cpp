@@ -1,6 +1,6 @@
 #include "GameObject.h"
 
-// Konstruktor klasy bazowej
+
 GameObject::GameObject(float startX, float startY, float startSpeed) {
     position.x = startX;
     position.y = startY;
@@ -13,7 +13,7 @@ void GameObject::forceMove(float dx, float dy) {
     position.y += dy;
     shape.setPosition(position);
 }
-// (gettery)
+
 sf::Vector2f GameObject::getPosition() const {
     return position;
 }

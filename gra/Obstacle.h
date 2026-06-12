@@ -7,4 +7,5 @@ public:
     Obstacle(float startX, float startY, float width, float height);
     void update(float dt) override;
     void draw(sf::RenderWindow& window) override;
+    sf::Texture texture;
 };

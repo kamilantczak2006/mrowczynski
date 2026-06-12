@@ -1,7 +1,6 @@
 #pragma once
 #include "Enemy.h"
 
-// Dziedziczymy po Enemy!
 class ShooterEnemy : public Enemy {
 private:
     float shootTimer;
