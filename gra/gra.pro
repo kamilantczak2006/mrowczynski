@@ -4,21 +4,25 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += \
-        Bullet.cpp \
-        Enemy.cpp \
-        GameObject.cpp \
-        Obstacle.cpp \
-        Portal.cpp \
-        ShooterEnemy.cpp \
-        Student.cpp \
-        main.cpp
-        INCLUDEPATH +=C:\SFML-2.6.2\include
-        LIBS+= -LC:\SFML-2.6.2\lib\
-                -lsfml-graphics \
-                -lsfml-window \
-                -lsfml-system
+    Boss.cpp \
+    Bullet.cpp \
+    Enemy.cpp \
+    GameObject.cpp \
+    Obstacle.cpp \
+    Portal.cpp \
+    ShooterEnemy.cpp \
+    Student.cpp \
+    main.cpp
+
+INCLUDEPATH += C:/SFML-2.6.2/include
+
+LIBS += -LC:/SFML-2.6.2/lib \
+    -lsfml-graphics \
+    -lsfml-window \
+    -lsfml-system
 
 HEADERS += \
+    Boss.h \
     Bullet.h \
     Enemy.h \
     GameObject.h \
@@ -26,3 +30,5 @@ HEADERS += \
     Portal.h \
     ShooterEnemy.h \
     Student.h
+
+DISTFILES +=

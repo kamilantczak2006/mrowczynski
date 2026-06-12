@@ -2,6 +2,7 @@
 #include <vector>
 #include <memory>
 #include <cstdlib>
+#include <ctime>
 #include <SFML/Graphics.hpp>
 
 #include "ShooterEnemy.h"
@@ -11,16 +12,14 @@
 #include "Enemy.h"
 #include "Bullet.h"
 #include "Obstacle.h"
+#include "Boss.h"
 
-// Funkcja wypychająca obiekty z przeszkód
 void resolveSolidCollision(GameObject* entity, GameObject* obstacle) {
     sf::FloatRect eBounds = entity->getBounds();
     sf::FloatRect oBounds = obstacle->getBounds();
     sf::FloatRect overlap;
 
-
     if (eBounds.intersects(oBounds, overlap)) {
-        // Wypychamy obiekt po krótszej osi przecięcia
         if (overlap.width < overlap.height) {
             if (eBounds.left < oBounds.left) entity->forceMove(-overlap.width, 0);
             else entity->forceMove(overlap.width, 0);
@@ -34,32 +33,21 @@ void resolveSolidCollision(GameObject* entity, GameObject* obstacle) {
 using namespace std;
 
 int main() {
+    srand(time(NULL));
     sf::RenderWindow window(sf::VideoMode(1280, 720), "Lochy Uwalonych");
     window.setFramerateLimit(60);
-
 
     sf::Font font;
     bool hasFont = font.loadFromFile("arial.ttf");
     if (!hasFont) {
-        cout << "UWAGA: Nie znaleziono pliku arial.ttf. UI bedzie wyswietlane w konsoli!" << endl;
+        cout << "UWAGA: Nie znaleziono pliku arial.ttf." << endl;
     }
 
-    sf::Text uiText;
-    if (hasFont) {
-        uiText.setFont(font);
-        uiText.setCharacterSize(24);
-        uiText.setFillColor(sf::Color::White);
-        uiText.setPosition(20.0f, 20.0f);
-    }
-
-    // --- GŁÓWNY KONTENER GRY ---
     vector<unique_ptr<GameObject>> allObjects;
-
 
     auto playerPtr = make_unique<Student>(1280.0f / 2.0f, 720.0f / 2.0f);
     Student* player = playerPtr.get();
     allObjects.push_back(move(playerPtr));
-
 
     sf::Clock clock;
     sf::Clock enemySpawnClock;
@@ -74,21 +62,130 @@ int main() {
     bool portalSpawned = false;
     float transitionTimer = 0.0f;
 
+    // Stany gry
+    bool inMainMenu = true;
+    bool isPaused = false;
+    bool inUpgradeMenu = false;
 
+    // Metaprogresja i Boosty
+    bool buffDoubleSpeed = false;
+    bool buffDoubleDamage = false;
+    bool unlockedNewStudent = false;
+    bool playAsNewStudent = false;
 
-    // Generowanie przeszkód dla poziomu 1
+    // NOWE BOOSTY DLA NOWEGO STUDENTA
+    bool buffL4 = false;
+    bool buffSciaga = false;
+    bool buffDziekanka = false;
+
+    sf::Text uiText;
+    if (hasFont) {
+        uiText.setFont(font);
+        uiText.setCharacterSize(24);
+        uiText.setFillColor(sf::Color::White);
+        uiText.setPosition(20.0f, 20.0f);
+    }
+
+    // --- ELEMENTY MENU STARTOWEGO ---
+    sf::Text titleText, controlsText, startButtonText, unlockText, newStudentBtnText;
+    sf::RectangleShape startButton(sf::Vector2f(250.0f, 60.0f));
+    sf::RectangleShape newStudentButton(sf::Vector2f(380.0f, 60.0f)); // Poszerzony przycisk
+
+    if (hasFont) {
+        titleText.setFont(font);
+        titleText.setCharacterSize(60);
+        titleText.setFillColor(sf::Color::Yellow);
+        titleText.setString("LOCHY UWALONYCH");
+        titleText.setPosition(1280.0f / 2.0f - 280.0f, 120.0f);
+
+        controlsText.setFont(font);
+        controlsText.setCharacterSize(26);
+        controlsText.setFillColor(sf::Color::White);
+        controlsText.setString("STEROWANIE:\nWSAD - Poruszanie sie\nSpacja - Dash\nStrzalki - strzelanie\n\nCel: Przetrwaj 4 pokoje i pokonaj Krola Warunkow!");
+        controlsText.setPosition(1280.0f / 2.0f - 300.0f, 250.0f);
+
+        startButton.setFillColor(sf::Color(0, 150, 0));
+        startButtonText.setFont(font);
+        startButtonText.setCharacterSize(30);
+        startButtonText.setFillColor(sf::Color::White);
+        startButtonText.setString("START");
+
+        newStudentButton.setFillColor(sf::Color(150, 0, 150));
+        newStudentBtnText.setFont(font);
+        newStudentBtnText.setCharacterSize(20); // Zmniejszona czcionka dla lepszego dopasowania
+        newStudentBtnText.setFillColor(sf::Color::White);
+        newStudentBtnText.setString("STUDENT DRUGIEGO STOPNIA\n(1 HP, Dmg x3)");
+
+        unlockText.setFont(font);
+        unlockText.setCharacterSize(28);
+        unlockText.setFillColor(sf::Color::Cyan);
+        unlockText.setString("Gra ukonczona - odblokowano nowego studenta!");
+    }
+
+    // --- ELEMENTY EKRANU KOŃCOWEGO ---
+    sf::RectangleShape returnButton(sf::Vector2f(300.0f, 60.0f));
+    sf::Text returnBtnText;
+    if (hasFont) {
+        returnButton.setFillColor(sf::Color(100, 100, 100));
+        returnButton.setPosition(1280.0f / 2.0f - 150.0f, 500.0f);
+        returnBtnText.setFont(font);
+        returnBtnText.setCharacterSize(24);
+        returnBtnText.setFillColor(sf::Color::White);
+        returnBtnText.setString("WROC DO MENU");
+        returnBtnText.setPosition(1280.0f / 2.0f - 90.0f, 515.0f);
+    }
+
+    // --- ELEMENTY PAUZY ---
+    sf::RectangleShape pauseOverlay(sf::Vector2f(1280.0f, 720.0f));
+    sf::Text pauseText;
+    if (hasFont) {
+        pauseOverlay.setFillColor(sf::Color(0, 0, 0, 150));
+        pauseText.setFont(font);
+        pauseText.setCharacterSize(50);
+        pauseText.setFillColor(sf::Color::Yellow);
+        pauseText.setString("PAUZA\nWcisnij ESC, aby wrocic");
+        pauseText.setPosition(1280.0f / 2.0f - 250.0f, 720.0f / 2.0f - 50.0f);
+    }
+
+    // --- ELEMENTY MENU ULEPSZEŃ ---
+    sf::Text upgTitle, upgText1, upgText2, upgText3;
+    sf::RectangleShape upgBtn1(sf::Vector2f(280.0f, 180.0f));
+    sf::RectangleShape upgBtn2(sf::Vector2f(280.0f, 180.0f));
+    sf::RectangleShape upgBtn3(sf::Vector2f(280.0f, 180.0f));
+
+    if (hasFont) {
+        upgTitle.setFont(font);
+        upgTitle.setCharacterSize(45);
+        upgTitle.setFillColor(sf::Color::Yellow);
+        upgTitle.setString("PORTAL ZAMKNIETY! WYBIERZ ULEPSZENIE:");
+        upgTitle.setPosition(1280.0f / 2.0f - 450.0f, 150.0f);
+
+        upgBtn1.setPosition(150.0f, 300.0f);
+        upgBtn1.setFillColor(sf::Color(180, 30, 30));
+
+        upgBtn2.setPosition(500.0f, 300.0f);
+        upgBtn2.setFillColor(sf::Color(100, 50, 20));
+
+        upgBtn3.setPosition(850.0f, 300.0f);
+        upgBtn3.setFillColor(sf::Color(80, 20, 150));
+
+        upgText1.setFont(font); upgText1.setCharacterSize(24); upgText1.setFillColor(sf::Color::White);
+        upgText2.setFont(font); upgText2.setCharacterSize(24); upgText2.setFillColor(sf::Color::White);
+        upgText3.setFont(font); upgText3.setCharacterSize(24); upgText3.setFillColor(sf::Color::White);
+    }
+
+    // Generowanie początkowych przeszkód
     for (int i = 0; i < 5; i++) {
-        float w = 50.0f + (rand() % 100);
-        float h = 50.0f + (rand() % 100);
-        // Unikamy środka mapy (gdzie pojawia się gracz)
+        float w = 50.0f + (rand() % 100); float h = 50.0f + (rand() % 100);
         float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
         float y = 100.0f + rand() % 500;
         allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
     }
 
-    // Główna pętla
+    // ==========================================
+    //            GŁÓWNA PĘTLA GRY
+    // ==========================================
     while (window.isOpen()) {
-
 
         float dt = clock.restart().asSeconds();
         bool playerEnteredPortal = false;
@@ -96,58 +193,196 @@ int main() {
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed) window.close();
+
+            sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+            float mx = static_cast<float>(mousePos.x);
+            float my = static_cast<float>(mousePos.y);
+
+            // Obsługa kliknięć w MENU GŁÓWNYM
+            if (inMainMenu && event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                if (startButton.getGlobalBounds().contains(mx, my)) {
+                    playAsNewStudent = false;
+                    inMainMenu = false; clock.restart();
+                } else if (unlockedNewStudent && newStudentButton.getGlobalBounds().contains(mx, my)) {
+                    playAsNewStudent = true;
+                    inMainMenu = false; clock.restart();
+
+                    int failsafe = 0;
+                    while(player->getHp() > 1 && failsafe < 10) {
+                        player->takeDamage(1);
+                        player->update(2.0f);
+                        failsafe++;
+                    }
+                }
+            }
+
+            // Obsługa kliknięć na EKRANIE KOŃCOWYM
+            if ((isGameOver || isGameWon) && event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                if (returnButton.getGlobalBounds().contains(mx, my)) {
+                    if (isGameWon) unlockedNewStudent = true;
+
+                    isGameOver = false;
+                    isGameWon = false;
+                    inMainMenu = true;
+
+                    currentLevel = 1;
+                    enemiesToSpawnThisLevel = 3;
+                    enemiesSpawnedSoFar = 0;
+                    transitionTimer = 0.0f;
+                    portalSpawned = false;
+
+                    // Reset wszystkich boostów obu postaci
+                    buffDoubleSpeed = false;
+                    buffDoubleDamage = false;
+                    buffL4 = false;
+                    buffSciaga = false;
+                    buffDziekanka = false;
+
+                    allObjects.clear();
+                    auto newPlayerPtr = make_unique<Student>(1280.0f / 2.0f, 720.0f / 2.0f);
+                    player = newPlayerPtr.get();
+                    allObjects.push_back(move(newPlayerPtr));
+
+                    for (int i = 0; i < 5; i++) {
+                        float w = 50.0f + (rand() % 100); float h = 50.0f + (rand() % 100);
+                        float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
+                        float y = 100.0f + rand() % 500;
+                        allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
+                    }
+                    clock.restart();
+                }
+            }
+
+            // Klikanie w Ekranie Ulepszeń
+            if (inUpgradeMenu && event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
+                if (upgBtn1.getGlobalBounds().contains(mx, my)) {
+                    if (playAsNewStudent) buffL4 = true; else player->heal(1);
+                    inUpgradeMenu = false; clock.restart();
+                } else if (upgBtn2.getGlobalBounds().contains(mx, my)) {
+                    if (playAsNewStudent) buffSciaga = true; else buffDoubleSpeed = true;
+                    inUpgradeMenu = false; clock.restart();
+                } else if (upgBtn3.getGlobalBounds().contains(mx, my)) {
+                    if (playAsNewStudent) buffDziekanka = true; else buffDoubleDamage = true;
+                    inUpgradeMenu = false; clock.restart();
+                }
+            }
+
+            // Obsługa klawisza ESC (Pauza)
+            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape) {
+                if (!inMainMenu && !inUpgradeMenu && !isGameOver && !isGameWon) {
+                    isPaused = !isPaused;
+                    if (!isPaused) clock.restart();
+                }
+            }
         }
 
-        if (!isGameWon && !isGameOver) {
+        // --- EKRANY ZAMRAŻAJĄCE GRĘ ---
+        if (inMainMenu) {
+            window.clear(sf::Color(20, 20, 20));
+            if (hasFont) {
+                window.draw(titleText); window.draw(controlsText);
+                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                float mx = static_cast<float>(mousePos.x);
+                float my = static_cast<float>(mousePos.y);
 
-            // Sprawdzenie stanu gracza
+                if (unlockedNewStudent) {
+                    startButtonText.setString("ZWYKLY STUDENT");
+                    startButtonText.setCharacterSize(22);
+                    startButton.setPosition(1280.0f / 2.0f - 300.0f, 520.0f);
+                    startButtonText.setPosition(1280.0f / 2.0f - 275.0f, 535.0f);
+
+                    newStudentButton.setPosition(1280.0f / 2.0f + 50.0f, 520.0f);
+                    newStudentBtnText.setPosition(1280.0f / 2.0f + 65.0f, 525.0f); // Dopasowane koordynaty tekstu
+
+                    unlockText.setPosition(1280.0f / 2.0f - 270.0f, 460.0f);
+
+                    newStudentButton.setFillColor(newStudentButton.getGlobalBounds().contains(mx, my) ? sf::Color(200, 0, 200) : sf::Color(150, 0, 150));
+                    window.draw(unlockText);
+                    window.draw(newStudentButton);
+                    window.draw(newStudentBtnText);
+                } else {
+                    startButtonText.setString("START");
+                    startButtonText.setCharacterSize(30);
+                    startButton.setPosition(1280.0f / 2.0f - 125.0f, 520.0f);
+                    startButtonText.setPosition(1280.0f / 2.0f - 45.0f, 530.0f);
+                }
+
+                startButton.setFillColor(startButton.getGlobalBounds().contains(mx, my) ? sf::Color(0, 200, 0) : sf::Color(0, 150, 0));
+                window.draw(startButton); window.draw(startButtonText);
+            }
+            window.display();
+            continue;
+        }
+
+        if (inUpgradeMenu) {
+            window.clear(sf::Color(30, 20, 40));
+            if (hasFont) {
+                if (playAsNewStudent) {
+                    upgText1.setString("ZWOLNIENIE L4\n\nIgnoruje pierwszy\ncios na poziomie!");
+                    upgText1.setPosition(165.0f, 320.0f);
+
+                    upgText2.setString("SCIAGA\n\nPociski przenikaja\nprzez sciany!");
+                    upgText2.setPosition(515.0f, 320.0f);
+
+                    upgText3.setString("DZIEKANKA\n\nWrogowie i pociski\nzwalniaja o 50%!");
+                    upgText3.setPosition(865.0f, 320.0f);
+                } else {
+                    upgText1.setString("SERDUSZKO\n\nLeczy +1 HP\nOd razu!");
+                    upgText1.setPosition(170.0f, 320.0f);
+
+                    upgText2.setString("MOCNA KAWA\n\nPredkosc x1.5\n(Tylko ten poziom)");
+                    upgText2.setPosition(520.0f, 320.0f);
+
+                    upgText3.setString("FURIA\n\nObrazenia x2\n(Tylko ten poziom)");
+                    upgText3.setPosition(870.0f, 320.0f);
+                }
+
+                window.draw(upgTitle);
+
+                sf::Vector2i mPos = sf::Mouse::getPosition(window);
+                upgBtn1.setOutlineThickness(upgBtn1.getGlobalBounds().contains(mPos.x, mPos.y) ? 5.0f : 0.0f);
+                upgBtn2.setOutlineThickness(upgBtn2.getGlobalBounds().contains(mPos.x, mPos.y) ? 5.0f : 0.0f);
+                upgBtn3.setOutlineThickness(upgBtn3.getGlobalBounds().contains(mPos.x, mPos.y) ? 5.0f : 0.0f);
+
+                window.draw(upgBtn1); window.draw(upgText1);
+                window.draw(upgBtn2); window.draw(upgText2);
+                window.draw(upgBtn3); window.draw(upgText3);
+            }
+            window.display();
+            continue;
+        }
+
+        // --- GŁÓWNA LOGIKA GRY ---
+        if (!isGameWon && !isGameOver && !isPaused) {
+
             if (player->getHp() <= 0) {
                 isGameOver = true;
                 if (hasFont) {
-                    uiText.setCharacterSize(36);
-                    uiText.setPosition(1280.0f / 4.0f, 720.0f / 3.0f);
-                    uiText.setString("GAME OVER!\nPrzegrales na poziomie: " + to_string(currentLevel) + "\nZamknij okno, aby wyjsc.");
-                } else cout << "GAME OVER!" << endl;
+                    uiText.setCharacterSize(40);
+                    uiText.setPosition(1280.0f / 2.0f - 250.0f, 250.0f);
+                    uiText.setString("GAME OVER!\nPrzegrales na poziomie: " + to_string(currentLevel));
+                }
             }
 
-            // Logika Fal
             int activeEnemies = 0;
             for (auto& obj : allObjects) {
                 if (dynamic_cast<Enemy*>(obj.get())) activeEnemies++;
             }
 
-            // Jeśli pokonano wszystkich wrogów na obecnym poziomie:
             if (enemiesSpawnedSoFar >= enemiesToSpawnThisLevel && activeEnemies == 0) {
-                if (currentLevel < 3) {
-                    // Spawnuje portal tylko raz
-                    if (!portalSpawned) {
-                        allObjects.push_back(make_unique<Portal>(1280.0f / 2.0f, 720.0f / 2.0f));
-                        portalSpawned = true;
-                    }
-                } else {
-                    // Koniec gry na najwyższym poziomie
-                    isGameWon = true;
-                    if (hasFont) {
-                        uiText.setCharacterSize(36);
-                        uiText.setPosition(1280.0f / 4.0f, 720.0f / 3.0f);
-                        uiText.setString("GRATULACJE! UKONCZYLES CALA GRE!\nKONCOWY POZIOM: " + to_string(currentLevel) + "\nZamknij okno, aby wyjsc.");
-                    } else cout << "WYGRANA!" << endl;
+                if (!portalSpawned) {
+                    allObjects.push_back(make_unique<Portal>(1280.0f / 2.0f, 720.0f / 2.0f));
+                    portalSpawned = true;
                 }
             }
 
-            // Odejmujemy czas od licznika napisu
-            if (transitionTimer > 0.0f) {
-                transitionTimer -= dt;
-            }
+            if (transitionTimer > 0.0f) transitionTimer -= dt;
 
-            // 3. Spawnowanie Przeciwników (dodany warunek transitionTimer <= 0.0f)
+            // Spawnowanie Wrogów
             if (enemiesSpawnedSoFar < enemiesToSpawnThisLevel && transitionTimer <= 0.0f) {
                 if (enemySpawnClock.getElapsedTime().asSeconds() >= enemySpawnCooldown) {
-                    // ... (tutaj reszta Twojego kodu losująca pozycję i tworząca wroga) ...
                     float speed = 100.0f + (currentLevel * 20.0f);
                     int hp = 2;
-
-
                     int edge = rand() % 4;
                     float startX = 0, startY = 0;
                     if (edge == 0)      { startX = rand() % 1280; startY = -20; }
@@ -155,16 +390,11 @@ int main() {
                     else if (edge == 2) { startX = -20; startY = rand() % 720; }
                     else                { startX = 1300; startY = rand() % 720; }
 
-
                     if (currentLevel >= 2 && rand() % 100 < 30) {
-
                         allObjects.push_back(make_unique<ShooterEnemy>(startX, startY, speed * 0.7f, hp));
                     } else {
-
                         allObjects.push_back(make_unique<Enemy>(startX, startY, speed, hp));
                     }
-
-                    allObjects.push_back(make_unique<Enemy>(startX, startY, speed, hp));
                     enemiesSpawnedSoFar++;
                     enemySpawnClock.restart();
                 }
@@ -176,7 +406,6 @@ int main() {
                 allObjects.push_back(make_unique<Bullet>(player->getPosition().x, player->getPosition().y, shootDir, 420.0f, sf::Color::Cyan, false));
             }
 
-            //Strzelanie Przeciwników
             vector<unique_ptr<GameObject>> enemyBullets;
             for (auto& obj : allObjects) {
                 if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
@@ -186,35 +415,50 @@ int main() {
                     }
                 }
             }
+            for (auto& b : enemyBullets) allObjects.push_back(move(b));
 
-            // Dodanie zebranych pocisków na mapę
-            for (auto& b : enemyBullets) {
-                allObjects.push_back(move(b));
+            // Sługusy Bossa
+            vector<unique_ptr<GameObject>> summonedEnemies;
+            for (auto& obj : allObjects) {
+                if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
+                    if (e->trySummon()) {
+                        float bx = e->getPosition().x; float by = e->getPosition().y;
+                        summonedEnemies.push_back(make_unique<Enemy>(bx - 100.0f, by + 50.0f, 160.0f, 2));
+                        summonedEnemies.push_back(make_unique<Enemy>(bx + 100.0f, by + 50.0f, 160.0f, 2));
+                    }
+                }
             }
+            for (auto& newEnemy : summonedEnemies) allObjects.push_back(move(newEnemy));
+
             for (auto& obj : allObjects) {
                 if (Enemy* e = dynamic_cast<Enemy*>(obj.get())) {
                     e->setTargetPosition(player->getPosition());
                 }
             }
 
-
+            // --- SYSTEM AKTUALIZACJI FIZYKI (Z KAWĄ I DZIEKANKĄ) ---
             for (auto& obj : allObjects) {
-                obj->update(dt);
+                float timeModifier = 1.0f;
+
+                if (obj.get() == player && buffDoubleSpeed) {
+                    timeModifier = 1.5f;
+                }
+                else if (dynamic_cast<Enemy*>(obj.get()) && buffDziekanka) {
+                    timeModifier = 0.5f;
+                }
+                else if (Bullet* b = dynamic_cast<Bullet*>(obj.get())) {
+                    if (b->isEnemyBullet && buffDziekanka) {
+                        timeModifier = 0.5f;
+                    }
+                }
+
+                obj->update(dt * timeModifier);
             }
 
-
-            //FIZYKA BARYKAD
-
-
-
-
-
+            // Fizyka Barykad
             for (auto& obj : allObjects) {
                 if (Obstacle* obs = dynamic_cast<Obstacle*>(obj.get())) {
-                    // Sprawdzamy zderzenie gracza z tą przeszkodą
                     resolveSolidCollision(player, obs);
-
-                    // Sprawdzamy zderzenie każdego wroga z tą przeszkodą
                     for (auto& other : allObjects) {
                         if (Enemy* e = dynamic_cast<Enemy*>(other.get())) {
                             resolveSolidCollision(e, obs);
@@ -223,48 +467,60 @@ int main() {
                 }
             }
 
+            // Zderzenia i Usuwanie
             for (auto it = allObjects.begin(); it != allObjects.end(); ) {
                 bool eraseObj = false;
 
-
                 if (Enemy* e = dynamic_cast<Enemy*>(it->get())) {
                     if (e->getBounds().intersects(player->getBounds())) {
-                        player->takeDamage(1); // Student rani się o wroga
+                        if (buffL4) {
+                            buffL4 = false;
+                            player->takeDamage(1); player->heal(1);
+                        } else {
+                            player->takeDamage(1);
+                        }
                     }
-                    if (e->getHp() <= 0) eraseObj = true; // Wróg zginął
+                    if (e->getHp() <= 0) eraseObj = true;
                 }
-
-
                 else if (Bullet* b = dynamic_cast<Bullet*>(it->get())) {
                     sf::Vector2f pos = b->getPosition();
                     bool hitObstacle = false;
 
-                    // Najpierw sprawdzamy, czy pocisk uderzył w ścianę
                     for (auto& other : allObjects) {
                         if (Obstacle* obs = dynamic_cast<Obstacle*>(other.get())) {
                             if (b->getBounds().intersects(obs->getBounds())) {
-                                hitObstacle = true;
-                                break;
+                                if (buffSciaga && !b->isEnemyBullet) {
+                                    break;
+                                }
+                                hitObstacle = true; break;
                             }
                         }
                     }
 
                     if (pos.x < 0 || pos.x > 1280 || pos.y < 0 || pos.y > 720 || hitObstacle) {
-                        eraseObj = true; // Usuwamy pocisk, bo wybuchł na przeszkodzie lub wyleciał z mapy
+                        eraseObj = true;
                     } else {
-
                         if (b->isEnemyBullet) {
-                            // POCISK WROGA - rani tylko gracza
                             if (b->getBounds().intersects(player->getBounds())) {
-                                player->takeDamage(1);
+                                if (buffL4) {
+                                    buffL4 = false;
+                                    player->takeDamage(1); player->heal(1);
+                                } else {
+                                    player->takeDamage(1);
+                                }
                                 eraseObj = true;
                             }
                         } else {
-                            // POCISK GRACZA - rani wrogów
+                            // POCISK GRACZA - OBLICZANIE OBRAŻEŃ
                             for (auto& other : allObjects) {
                                 if (Enemy* e = dynamic_cast<Enemy*>(other.get())) {
                                     if (e->getHp() > 0 && e->getBounds().intersects(b->getBounds())) {
-                                        e->takeDamage(1);
+
+                                        int finalDamage = 1;
+                                        if (buffDoubleDamage) finalDamage *= 2;
+                                        if (playAsNewStudent) finalDamage *= 3;
+
+                                        e->takeDamage(finalDamage);
                                         eraseObj = true;
                                         break;
                                     }
@@ -273,9 +529,6 @@ int main() {
                         }
                     }
                 }
-
-
-
                 else if (Portal* p = dynamic_cast<Portal*>(it->get())) {
                     if (p->getBounds().intersects(player->getBounds())) {
                         playerEnteredPortal = true;
@@ -283,77 +536,139 @@ int main() {
                     }
                 }
 
-                if (eraseObj) {
-                    it = allObjects.erase(it);
-                } else {
-                    ++it;
-                }
+                if (eraseObj) it = allObjects.erase(it);
+                else ++it;
             }
-
 
             if (hasFont && !isGameOver && !isGameWon) {
+                uiText.setCharacterSize(24);
+                uiText.setPosition(20.0f, 20.0f);
                 int remainingEnemies = (enemiesToSpawnThisLevel - enemiesSpawnedSoFar) + activeEnemies;
+                string activeBuffs = "";
+                if (buffDoubleSpeed) activeBuffs += "\nAKTYWNY BOOST: Kawa (x1.5 Ruch)";
+                if (buffDoubleDamage) activeBuffs += "\nAKTYWNY BOOST: Furia (x2 Obrazenia)";
+                if (buffL4) activeBuffs += "\nAKTYWNY BOOST: Zwolnienie L4 (Tarcza aktywna)";
+                if (buffSciaga) activeBuffs += "\nAKTYWNY BOOST: Sciaga (Pociski przenikaja sciany)";
+                if (buffDziekanka) activeBuffs += "\nAKTYWNY BOOST: Dziekanka (Wrogowie zwolnieni)";
+
                 uiText.setString("POZIOM: " + to_string(currentLevel) +
                                  "\nHP GRACZA: " + to_string(player->getHp()) +
-                                 "\nPOZOSTALO WROGOW: " + to_string(remainingEnemies));
+                                 "\nPOZOSTALO WROGOW: " + to_string(remainingEnemies) + activeBuffs);
             }
         }
 
-
-
+        // --- ZMIANA POZIOMU / KONIEC GRY ---
         if (playerEnteredPortal) {
-            currentLevel++;
-            enemiesSpawnedSoFar = 0;
-            portalSpawned = false;
-            transitionTimer = 2.0f;
-
-            if (currentLevel == 2) enemiesToSpawnThisLevel = 5;
-            else if (currentLevel == 3) enemiesToSpawnThisLevel = 8;
-
-            // USUWANIE starych przeszkód i pocisków
-            for (auto it = allObjects.begin(); it != allObjects.end(); ) {
-                if (dynamic_cast<Obstacle*>(it->get()) || dynamic_cast<Bullet*>(it->get())) {
-                    it = allObjects.erase(it);
-                } else {
-                    ++it;
+            if (currentLevel == 5) {
+                isGameWon = true;
+                if (hasFont) {
+                    uiText.setCharacterSize(40);
+                    uiText.setPosition(1280.0f / 2.0f - 350.0f, 250.0f);
+                    uiText.setString("GRATULACJE! UKONCZYLES CALA GRE!\nPokonales Krola Warunkow!");
                 }
-            }
+            } else {
+                currentLevel++;
+                enemiesSpawnedSoFar = 0;
+                portalSpawned = false;
+                transitionTimer = 2.0f;
 
-            // GENEROWANIE przeszkód
-            for (int i = 0; i < 4 + currentLevel; i++) {
-                float w = 50.0f + (rand() % 100);
-                float h = 50.0f + (rand() % 100);
-                float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
-                float y = 100.0f + rand() % 500;
-                allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
+                buffDoubleSpeed = false;
+                buffDoubleDamage = false;
+                buffL4 = false;
+                buffSciaga = false;
+                buffDziekanka = false;
+
+                if (currentLevel <= 5) inUpgradeMenu = true;
+
+                if (currentLevel == 2) enemiesToSpawnThisLevel = 5;
+                else if (currentLevel == 3) enemiesToSpawnThisLevel = 8;
+                else if (currentLevel == 4) enemiesToSpawnThisLevel = 12;
+                else if (currentLevel == 5) {
+                    enemiesToSpawnThisLevel = 1;
+
+                    // --- ZMIANA HP BOSSA W ZALEŻNOŚCI OD POSTACI ---
+                    int bossHp = playAsNewStudent ? 100 : 50;
+                    allObjects.push_back(make_unique<Boss>(1280.0f / 2.0f, 150.0f, bossHp));
+                    enemiesSpawnedSoFar = 1;
+                }
+
+                for (auto it = allObjects.begin(); it != allObjects.end(); ) {
+                    if (dynamic_cast<Obstacle*>(it->get()) || dynamic_cast<Bullet*>(it->get())) {
+                        it = allObjects.erase(it);
+                    } else ++it;
+                }
+
+                if(currentLevel != 5){
+                    for (int i = 0; i < 5; i++) {
+                        float w = 50.0f + (rand() % 100); float h = 50.0f + (rand() % 100);
+                        float x = (rand() % 2 == 0) ? (100.0f + rand() % 400) : (800.0f + rand() % 400);
+                        float y = 100.0f + rand() % 500;
+                        allObjects.push_back(make_unique<Obstacle>(x, y, w, h));
+                    }
+                }
+
+                if (inUpgradeMenu) continue;
             }
         }
-
 
         // --- RYSOWANIE ---
         window.clear(sf::Color(30, 30, 30));
 
         if (!isGameWon && !isGameOver) {
-            for (auto& obj : allObjects) {
-                obj->draw(window);
-            }
+            for (auto& obj : allObjects) obj->draw(window);
         }
 
         if (hasFont) {
-            window.draw(uiText); // Rysuje zwykłe statystyki w lewym górnym rogu
+            window.draw(uiText);
 
-            // Rysuje wielki napis na środku, jeśli licznik działa
-            if (transitionTimer > 0.0f) {
+            if (transitionTimer > 0.0f && !isGameWon && !isGameOver) {
                 sf::Text transitionText;
                 transitionText.setFont(font);
                 transitionText.setCharacterSize(50);
                 transitionText.setFillColor(sf::Color::Yellow);
                 transitionText.setString("PRZECHODZISZ NA POZIOM " + to_string(currentLevel) + "!");
-
-                // Wyśrodkowanie tekstu na oko
                 transitionText.setPosition(1280.0f / 2.0f - 350.0f, 720.0f / 2.0f - 50.0f);
-
                 window.draw(transitionText);
+            }
+
+            if (currentLevel == 5 && !isGameWon && !isGameOver) {
+                Boss* bossPtr = nullptr;
+                for (auto& obj : allObjects) {
+                    if (Boss* b = dynamic_cast<Boss*>(obj.get())) { bossPtr = b; break; }
+                }
+
+                if (bossPtr && bossPtr->getHp() > 0) {
+                    sf::RectangleShape bg(sf::Vector2f(800.0f, 30.0f));
+                    bg.setPosition(1280.0f / 2.0f - 400.0f, 20.0f);
+                    bg.setFillColor(sf::Color(80, 0, 0));
+                    bg.setOutlineColor(sf::Color::White); bg.setOutlineThickness(3.0f);
+
+                    float hpPercent = (float)bossPtr->getHp() / bossPtr->maxHp;
+                    if (hpPercent < 0) hpPercent = 0.0f;
+                    sf::RectangleShape fg(sf::Vector2f(800.0f * hpPercent, 30.0f));
+                    fg.setPosition(1280.0f / 2.0f - 400.0f, 20.0f);
+                    fg.setFillColor(sf::Color::Red);
+
+                    window.draw(bg); window.draw(fg);
+
+                    sf::Text bossText;
+                    bossText.setFont(font); bossText.setCharacterSize(22); bossText.setFillColor(sf::Color::White);
+                    bossText.setString("KROL WARUNKOW - HP: " + to_string(bossPtr->getHp()));
+                    bossText.setPosition(1280.0f / 2.0f - 140.0f, 22.0f);
+                    window.draw(bossText);
+                }
+            }
+
+            if (isGameOver || isGameWon) {
+                sf::Vector2i mPos = sf::Mouse::getPosition(window);
+                returnButton.setFillColor(returnButton.getGlobalBounds().contains(mPos.x, mPos.y) ? sf::Color(130, 130, 130) : sf::Color(100, 100, 100));
+                window.draw(returnButton);
+                window.draw(returnBtnText);
+            }
+
+            if (isPaused) {
+                window.draw(pauseOverlay);
+                window.draw(pauseText);
             }
         }
 

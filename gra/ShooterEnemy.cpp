@@ -4,10 +4,15 @@
 ShooterEnemy::ShooterEnemy(float startX, float startY, float startSpeed, int startHp)
     : Enemy(startX, startY, startSpeed, startHp) { // Wywołujemy konstruktor rodzica
 
-    // Zmieniamy kolor na pomarańczowy, żeby gracz wiedział, kto do niego wali
+
     circleShape.setFillColor(sf::Color(255, 128, 0));
     shootCooldown = 2.0f; // Strzela co 2 sekundy
     shootTimer = shootCooldown;
+
+    if (texture.loadFromFile("shooter.png")) {
+        sprite.setTexture(texture);
+        sprite.setOrigin(25.0f, 25.0f);
+    }
 }
 
 void ShooterEnemy::update(float dt) {

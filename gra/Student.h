@@ -19,6 +19,8 @@ private:
 
     float shootCooldownTimer;
     float damageCooldownTimer;
+    sf::Texture texture;
+    sf::Sprite sprite;
 
 public:
     Student(float startX, float startY);
@@ -33,4 +35,5 @@ public:
 
 
     bool tryShoot(sf::Vector2f& outDirection);
+    void heal(int amount);
 };

@@ -17,6 +17,10 @@ Enemy::Enemy(float startX, float startY, float startSpeed, int startHp)
 
     shape.setSize(sf::Vector2f(40.0f, 40.0f));
     shape.setOrigin(20.0f, 20.0f);
+    if (texture.loadFromFile("enemy.png")) {
+        sprite.setTexture(texture);
+        sprite.setOrigin(25.0f, 25.0f);
+    }
 }
 
 void Enemy::setTargetPosition(sf::Vector2f target) {
@@ -38,10 +42,11 @@ void Enemy::update(float dt) {
 
     circleShape.setPosition(position);
     shape.setPosition(position);
+    sprite.setPosition(position);
 }
 
 void Enemy::draw(sf::RenderWindow& window) {
-    window.draw(circleShape);
+    window.draw(sprite);
 }
 
 void Enemy::takeDamage(int amount) {
@@ -52,5 +57,8 @@ int Enemy::getHp() const {
     return hp;
 }
 bool Enemy::tryShoot(sf::Vector2f& outDir) {
+    return false;
+}
+bool Enemy::trySummon() {
     return false;
 }

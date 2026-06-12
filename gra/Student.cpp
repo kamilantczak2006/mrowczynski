@@ -23,6 +23,11 @@ Student::Student(float startX, float startY)
     shape.setFillColor(sf::Color::Green);
     shape.setOrigin(25.0f, 25.0f); // Ustawienie punktu centralnego
     shape.setPosition(position);
+
+    if (texture.loadFromFile("student.png")) {
+        sprite.setTexture(texture);
+        sprite.setOrigin(25.0f, 25.0f); // Ustawiamy środek obrazka
+    }
 }
 
 void Student::update(float dt) {
@@ -68,16 +73,11 @@ void Student::update(float dt) {
 
 
     shape.setPosition(position);
+    sprite.setPosition(position);
 }
 
 void Student::draw(sf::RenderWindow& window) {
-
-    if (damageCooldownTimer > 0.0f) {
-        shape.setFillColor(sf::Color::Red);
-    } else {
-        shape.setFillColor(sf::Color::Green);
-    }
-    window.draw(shape);
+    window.draw(sprite);
 }
 
 void Student::takeDamage(int damageAmount) {
@@ -111,4 +111,7 @@ bool Student::tryShoot(sf::Vector2f& outDirection) {
         return true;
     }
     return false;
+}
+void Student::heal(int amount) {
+    hp += amount;
 }
